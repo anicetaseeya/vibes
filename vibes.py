@@ -134,8 +134,11 @@ st.markdown('<div class="subtitle">Caesar Cipher Tool — encrypt and decrypt yo
 # ---------- CARD ----------
 st.markdown('<div class="card">', unsafe_allow_html=True)
 
-st.markdown('<div class="small-label">Enter your message</div>', unsafe_allow_html=True)
-message = st.text_area("", height=180, placeholder="Type your secret message here...")
+message = st.text_area(
+    "Enter your message",
+    height=180,
+    placeholder="Type your secret message here..."
+)
 
 shift = st.slider("Choose shift value", min_value=1, max_value=25, value=3)
 
