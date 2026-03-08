@@ -78,15 +78,6 @@ st.markdown("""
         margin-bottom: 2rem;
     }
 
-    .card {
-        background: rgba(255, 255, 255, 0.06);
-        padding: 2rem;
-        border-radius: 22px;
-        border: 1px solid rgba(255,255,255,0.12);
-        box-shadow: 0 8px 30px rgba(0,0,0,0.35);
-        backdrop-filter: blur(8px);
-    }
-
     div.stButton > button {
         width: 100%;
         border-radius: 12px;
@@ -129,22 +120,17 @@ st.markdown("""
         font-size: 0.9rem;
     }
 
-    label {
+    label, .stMarkdown, .stSlider label {
         color: #cbd5e1 !important;
-        font-weight: 500 !important;
     }
 
     .stTextArea textarea {
-        background: rgba(255,255,255,0.92) !important;
+        background: rgba(255,255,255,0.95) !important;
         color: #111827 !important;
         border-radius: 14px !important;
         border: none !important;
         padding: 1rem !important;
         font-size: 1.05rem !important;
-    }
-
-    .stSlider label {
-        color: #cbd5e1 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -155,8 +141,6 @@ st.markdown(
     '<div class="subtitle">Caesar Cipher Tool — encrypt and decrypt your secret messages</div>',
     unsafe_allow_html=True
 )
-
-st.markdown('<div class="card">', unsafe_allow_html=True)
 
 message = st.text_area(
     "Enter your message",
@@ -196,8 +180,6 @@ if decrypt_clicked:
 if result is not None:
     st.markdown(f'<div class="result-title">{result_title}</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="result-box">{result}</div>', unsafe_allow_html=True)
-
-st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown(
     '<div class="footer-text">Built with Streamlit • Caesar Cipher Visual Tool</div>',
