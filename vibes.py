@@ -49,12 +49,17 @@ def decrypt_message(message, cipher):
     return decrypted
 
 
-# ---------- STYLE ----------
 st.markdown("""
 <style>
     .stApp {
         background: linear-gradient(135deg, #0f172a, #111827, #1e293b);
         color: white;
+    }
+
+    .block-container {
+        padding-top: 3rem;
+        padding-bottom: 3rem;
+        max-width: 900px;
     }
 
     .main-title {
@@ -82,27 +87,10 @@ st.markdown("""
         backdrop-filter: blur(8px);
     }
 
-    .result-box {
-        background: #0b1220;
-        border: 1px solid #334155;
-        padding: 1rem;
-        border-radius: 14px;
-        font-size: 1.1rem;
-        color: #e2e8f0;
-        margin-top: 1rem;
-        word-wrap: break-word;
-    }
-
-    .small-label {
-        font-size: 0.95rem;
-        color: #cbd5e1;
-        margin-bottom: 0.3rem;
-    }
-
     div.stButton > button {
         width: 100%;
         border-radius: 12px;
-        padding: 0.7rem 1rem;
+        padding: 0.75rem 1rem;
         font-size: 1rem;
         font-weight: 600;
         border: none;
@@ -116,22 +104,58 @@ st.markdown("""
         opacity: 0.95;
     }
 
+    .result-title {
+        color: #e2e8f0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-top: 1.2rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .result-box {
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid #334155;
+        padding: 1rem;
+        border-radius: 14px;
+        font-size: 1.05rem;
+        color: #f8fafc;
+        word-wrap: break-word;
+    }
+
     .footer-text {
         text-align: center;
         color: #94a3b8;
         margin-top: 1.5rem;
         font-size: 0.9rem;
     }
+
+    label {
+        color: #cbd5e1 !important;
+        font-weight: 500 !important;
+    }
+
+    .stTextArea textarea {
+        background: rgba(255,255,255,0.92) !important;
+        color: #111827 !important;
+        border-radius: 14px !important;
+        border: none !important;
+        padding: 1rem !important;
+        font-size: 1.05rem !important;
+    }
+
+    .stSlider label {
+        color: #cbd5e1 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ---------- HEADER ----------
 st.markdown('<div class="main-title">🔐 Encryption Machine</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Caesar Cipher Tool — encrypt and decrypt your secret messages</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="subtitle">Caesar Cipher Tool — encrypt and decrypt your secret messages</div>',
+    unsafe_allow_html=True
+)
 
-
-# ---------- CARD ----------
 st.markdown('<div class="card">', unsafe_allow_html=True)
 
 message = st.text_area(
@@ -170,9 +194,12 @@ if decrypt_clicked:
         result_title = "Decrypted Message"
 
 if result is not None:
-    st.markdown(f"### {result_title}")
+    st.markdown(f'<div class="result-title">{result_title}</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="result-box">{result}</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="footer-text">Built with Streamlit • Simple Caesar Cipher Visual Tool</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="footer-text">Built with Streamlit • Caesar Cipher Visual Tool</div>',
+    unsafe_allow_html=True
+)
