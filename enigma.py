@@ -1,480 +1,459 @@
 import streamlit as st
 import random
-from collections import Counter
+import datetime
 
+# ============================================================
+# PAGE CONFIG
+# ============================================================
 
 st.set_page_config(
-    page_title="Enigma Cracker Simulator",
+    page_title="Enigma Machine Simulator",
     page_icon="🔐",
-    layout="centered"
+    layout="wide"
 )
 
-
 # ============================================================
-# STYLING
-# ============================================================
-
-st.markdown("""
-<style>
-    .stApp {
-        background: linear-gradient(135deg, #0f172a, #111827, #1e293b);
-        color: white;
-    }
-
-    .block-container {
-        padding-top: 2.5rem;
-        padding-bottom: 3rem;
-        max-width: 950px;
-    }
-
-    .main-title {
-        text-align: center;
-        font-size: 3rem;
-        font-weight: 800;
-        color: #f8fafc;
-        margin-bottom: 0.2rem;
-    }
-
-    .subtitle {
-        text-align: center;
-        font-size: 1.1rem;
-        color: #cbd5e1;
-        margin-bottom: 2rem;
-    }
-
-    .section-box {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 18px;
-        padding: 1.2rem;
-        margin-bottom: 1rem;
-    }
-
-    .result-box {
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid #334155;
-        padding: 1rem;
-        border-radius: 14px;
-        color: #f8fafc;
-        font-size: 1.02rem;
-        word-wrap: break-word;
-    }
-
-    div.stButton > button {
-        width: 100%;
-        border-radius: 12px;
-        padding: 0.75rem 1rem;
-        font-size: 1rem;
-        font-weight: 600;
-        border: none;
-        background: linear-gradient(90deg, #2563eb, #7c3aed);
-        color: white;
-    }
-
-    div.stButton > button:hover {
-        opacity: 0.95;
-        transform: scale(1.01);
-    }
-
-    .small-note {
-        color: #cbd5e1;
-        font-size: 0.95rem;
-    }
-
-    .step-title {
-        font-size: 1.15rem;
-        font-weight: 700;
-        color: #e2e8f0;
-        margin-bottom: 0.5rem;
-    }
-
-    .footer-text {
-        text-align: center;
-        color: #94a3b8;
-        margin-top: 1.5rem;
-        font-size: 0.9rem;
-    }
-
-    label {
-        color: #cbd5e1 !important;
-    }
-
-    .stTextArea textarea, .stTextInput input {
-        background: rgba(255,255,255,0.95) !important;
-        color: #111827 !important;
-        border-radius: 12px !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-
-# ============================================================
-# ENIGMA FUNCTIONS
+# CONSTANTS
 # ============================================================
 
-def create_dictionary(shift):
-    alphabet = "abcdefghijklmnopqrstuvwxyz"
-    cipher = {}
-    for i in range(len(alphabet)):
-        new_index = (i + shift) % len(alphabet)
-        cipher[alphabet[i]] = alphabet[new_index]
-    return cipher
+ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+ROTOR_I = "EKMFLGDQVZNTOWYHXUSPAIBRCJ"
+ROTOR_II = "AJDKSIRUXBLHWTMCQGZNPYFVOE"
+ROTOR_III = "BDFHJLCPRTXVZNYEIWGAKMUSQO"
+ROTOR_IV = "ESOVPZJAYQUIRHXLNFTGKDCMWB"
+ROTOR_V = "VZBRGITYUPSDNHLXAWMJQOFECK"
+REFLECTOR_B = "YRUHQSLDPXNGOKMIEBFZCWVJAT"
 
-def create_plugboard():
-    alphabet = list("abcdefghijklmnopqrstuvwxyz")
-    plugboard = {}
-    pairs = random.sample(alphabet, 10)
+NOTCH_I = ["Q"]
+NOTCH_II = ["E"]
+NOTCH_III = ["V"]
+NOTCH_IV = ["J"]
+NOTCH_V = ["Z"]
 
-    for i in range(0, 10, 2):
-        a, b = pairs[i], pairs[i + 1]
-        plugboard[a] = b
-        plugboard[b] = a
+ALL_ROTORS = [
+    (ROTOR_I, NOTCH_I, "I"),
+    (ROTOR_II, NOTCH_II, "II"),
+    (ROTOR_III, NOTCH_III, "III"),
+    (ROTOR_IV, NOTCH_IV, "IV"),
+    (ROTOR_V, NOTCH_V, "V"),
+]
 
-    for letter in alphabet:
-        if letter not in plugboard:
-            plugboard[letter] = letter
-
-    return plugboard
-
-
-def encrypt_enigma(message, rotors, plugboard):
-    encrypted = ""
-    for letter in message.lower():
-        if letter.isalpha():
-            c = plugboard[letter]
-            c = rotors[0][c]
-            c = rotors[1][c]
-            c = rotors[2][c]
-            c = plugboard[c]
-            encrypted += c
-        else:
-            encrypted += letter
-    return encrypted
-
-
-def decrypt_enigma(message, rotors, plugboard):
-    reverse_rotors = [{v: k for k, v in rotor.items()} for rotor in rotors]
-    decrypted = ""
-    for letter in message.lower():
-        if letter.isalpha():
-            c = plugboard[letter]
-            c = reverse_rotors[2][c]
-            c = reverse_rotors[1][c]
-            c = reverse_rotors[0][c]
-            c = plugboard[c]
-            decrypted += c
-        else:
-            decrypted += letter
-    return decrypted
-
+MESSAGE_TYPES = [
+    "MILITARY ORDER",
+    "INTELLIGENCE REPORT",
+    "DIPLOMATIC COMMUNICATION",
+    "FIELD TRANSMISSION",
+    "PERSONAL MESSAGE",
+    "UNCLASSIFIED"
+]
 
 # ============================================================
-# CRACKING FUNCTIONS
+# CLASSES
 # ============================================================
 
-def frequency_analysis(encrypted_message):
-    letters_only = [c for c in encrypted_message.lower() if c.isalpha()]
-    total = len(letters_only)
+class Rotor:
+    def __init__(self, wiring, notch, ring_setting=0, position=0):
+        self.wiring = wiring
+        self.notch = notch
+        self.ring_setting = ring_setting
+        self.position = position
 
-    if total == 0:
-        return [], None
+    def step(self):
+        self.position = (self.position + 1) % 26
 
-    counts = Counter(letters_only)
-    rows = []
+    def at_notch(self):
+        return ALPHABET[self.position] in self.notch
 
-    for letter, count in sorted(counts.items(), key=lambda x: -x[1])[:10]:
-        freq = (count / total) * 100
-        rows.append((letter, count, round(freq, 1)))
+    def encode_forward(self, letter_index):
+        offset = self.position - self.ring_setting
+        shifted = (letter_index + offset) % 26
+        wired = ALPHABET.index(self.wiring[shifted])
+        return (wired - offset) % 26
 
-    most_common = counts.most_common(1)[0][0]
-    return rows, most_common
-
-
-def crib_drag(encrypted_message, crib):
-    encrypted_clean = encrypted_message.replace(" ", "").lower()
-    crib = crib.replace(" ", "").lower()
-    results = []
-
-    if len(crib) == 0 or len(crib) > len(encrypted_clean):
-        return results
-
-    for i in range(len(encrypted_clean) - len(crib) + 1):
-        segment = encrypted_clean[i:i + len(crib)]
-
-        no_self_encrypt = all(segment[j] != crib[j] for j in range(len(crib)))
-
-        results.append({
-            "position": i,
-            "segment": segment,
-            "possible": no_self_encrypt
-        })
-
-    return results
+    def encode_backward(self, letter_index):
+        offset = self.position - self.ring_setting
+        shifted = (letter_index + offset) % 26
+        wired = self.wiring.index(ALPHABET[shifted])
+        return (wired - offset) % 26
 
 
-def bombe_attack(encrypted_message, crib, max_attempts_display=3000):
-    crib = crib.replace(" ", "").lower()
-    encrypted_clean = encrypted_message.replace(" ", "").lower()
+class Plugboard:
+    def __init__(self, pairs=None):
+        self.wiring = list(ALPHABET)
+        self.pairs = pairs or []
+
+        for a, b in self.pairs:
+            a = a.upper()
+            b = b.upper()
+            self.wiring[ALPHABET.index(a)] = b
+            self.wiring[ALPHABET.index(b)] = a
+
+    def encode(self, letter_index):
+        return ALPHABET.index(self.wiring[letter_index])
+
+
+class Reflector:
+    def __init__(self, wiring=REFLECTOR_B):
+        self.wiring = wiring
+
+    def encode(self, letter_index):
+        return ALPHABET.index(self.wiring[letter_index])
+
+
+class EnigmaMachine:
+    def __init__(self, rotors, reflector, plugboard):
+        self.rotors = rotors
+        self.reflector = reflector
+        self.plugboard = plugboard
+
+    def step_rotors(self):
+        # left, middle, right = 0,1,2
+        if self.rotors[1].at_notch():
+            self.rotors[1].step()
+            self.rotors[0].step()
+        elif self.rotors[2].at_notch():
+            self.rotors[1].step()
+        self.rotors[2].step()
+
+    def encrypt_letter(self, letter):
+        if letter not in ALPHABET:
+            return letter
+
+        self.step_rotors()
+        idx = ALPHABET.index(letter)
+
+        idx = self.plugboard.encode(idx)
+        idx = self.rotors[2].encode_forward(idx)
+        idx = self.rotors[1].encode_forward(idx)
+        idx = self.rotors[0].encode_forward(idx)
+        idx = self.reflector.encode(idx)
+        idx = self.rotors[0].encode_backward(idx)
+        idx = self.rotors[1].encode_backward(idx)
+        idx = self.rotors[2].encode_backward(idx)
+        idx = self.plugboard.encode(idx)
+
+        return ALPHABET[idx]
+
+    def encrypt_message(self, message):
+        return "".join(self.encrypt_letter(c) for c in message.upper())
+
+# ============================================================
+# HELPERS
+# ============================================================
+
+def generate_monthly_codebook():
+    today = datetime.date.today()
+    rng = random.Random(f"{today.year}-{today.month}")
+
+    codebook = {}
+    for day in range(1, 27):
+        rotor_choices = rng.sample(range(5), 3)
+        positions = [rng.randint(0, 25) for _ in range(3)]
+        ring_settings = [rng.randint(0, 25) for _ in range(3)]
+
+        letters = list(ALPHABET)
+        rng.shuffle(letters)
+        pairs = [(letters[i], letters[i + 1]) for i in range(0, 20, 2)]
+
+        codebook[day] = {
+            "rotors": rotor_choices,
+            "positions": positions,
+            "ring_settings": ring_settings,
+            "plugboard": pairs,
+        }
+    return codebook
+
+
+def get_todays_settings(codebook):
+    today = datetime.date.today()
+    day = min(today.day, 26)
+    return codebook[day], day
+
+
+def build_machine_from_settings(settings):
+    rotors = []
+    for i in range(3):
+        rotor_data = ALL_ROTORS[settings["rotors"][i]]
+        rotors.append(
+            Rotor(
+                wiring=rotor_data[0],
+                notch=rotor_data[1],
+                ring_setting=settings["ring_settings"][i],
+                position=settings["positions"][i],
+            )
+        )
+
+    reflector = Reflector(REFLECTOR_B)
+    plugboard = Plugboard(settings["plugboard"])
+    return EnigmaMachine(rotors, reflector, plugboard)
+
+
+def parse_plugboard_input(text):
+    """
+    Input format example:
+    AB CD EF GH
+    """
+    text = text.strip().upper()
+    if not text:
+        return []
+
+    raw_pairs = text.split()
+    pairs = []
+    used = set()
+
+    for pair in raw_pairs:
+        if len(pair) != 2 or not pair.isalpha():
+            raise ValueError(f"Invalid plugboard pair: {pair}")
+        a, b = pair[0], pair[1]
+        if a == b:
+            raise ValueError(f"Plugboard pair cannot use same letter twice: {pair}")
+        if a in used or b in used:
+            raise ValueError(f"Letter repeated in plugboard: {pair}")
+        used.add(a)
+        used.add(b)
+        pairs.append((a, b))
+
+    return pairs
+
+
+def build_manual_machine(rotor_indices, positions, ring_settings, plugboard_pairs):
+    rotors = []
+    for i in range(3):
+        rotor_data = ALL_ROTORS[rotor_indices[i]]
+        rotors.append(
+            Rotor(
+                wiring=rotor_data[0],
+                notch=rotor_data[1],
+                ring_setting=ring_settings[i],
+                position=positions[i],
+            )
+        )
+
+    reflector = Reflector(REFLECTOR_B)
+    plugboard = Plugboard(plugboard_pairs)
+    return EnigmaMachine(rotors, reflector, plugboard)
+
+
+def format_settings(settings):
+    rotor_names = [ALL_ROTORS[r][2] for r in settings["rotors"]]
+    positions = [ALPHABET[p] for p in settings["positions"]]
+    rings = settings["ring_settings"]
+    plugboard = " ".join([a + b for a, b in settings["plugboard"]])
+
+    return rotor_names, positions, rings, plugboard
+
+
+def bombe_crack(encrypted, crib):
+    """
+    Simplified demo version:
+    - only tests rotor positions
+    - assumes Rotor I, II, III
+    - no plugboard
+    """
+    encrypted_clean = encrypted.replace(" ", "").upper()
+    crib_clean = crib.replace(" ", "").upper()
 
     attempts = 0
-    progress_placeholder = st.empty()
 
-    for shift1 in range(1, 26):
-        for shift2 in range(1, 26):
-            for shift3 in range(1, 26):
+    for pos1 in range(26):
+        for pos2 in range(26):
+            for pos3 in range(26):
                 attempts += 1
 
-                test_rotors = [
-                    create_dictionary(shift1),
-                    create_dictionary(shift2),
-                    create_dictionary(shift3)
+                rotors = [
+                    Rotor(ROTOR_I, NOTCH_I, position=pos1),
+                    Rotor(ROTOR_II, NOTCH_II, position=pos2),
+                    Rotor(ROTOR_III, NOTCH_III, position=pos3),
                 ]
-                test_plugboard = {c: c for c in "abcdefghijklmnopqrstuvwxyz"}
+                machine = EnigmaMachine(rotors, Reflector(), Plugboard([]))
+                decrypted = machine.encrypt_message(encrypted_clean)
 
-                test_decrypt = decrypt_enigma(encrypted_clean, test_rotors, test_plugboard)
-
-                if attempts % 1000 == 0:
-                    progress_placeholder.info(f"Tested {attempts} rotor combinations...")
-
-                if crib in test_decrypt:
-                    progress_placeholder.success(f"Match found after {attempts} attempts.")
+                if crib_clean in decrypted:
                     return {
-                        "shift1": shift1,
-                        "shift2": shift2,
-                        "shift3": shift3,
-                        "decrypted": test_decrypt,
-                        "attempts": attempts
+                        "success": True,
+                        "attempts": attempts,
+                        "positions": f"{ALPHABET[pos1]} {ALPHABET[pos2]} {ALPHABET[pos3]}",
+                        "decrypted": decrypted,
                     }
 
-    progress_placeholder.error("No rotor match found.")
-    return None
-
-
-def check_english(decrypted_message):
-    common_words = [
-        "the", "and", "for", "are", "but", "not", "you", "all",
-        "can", "her", "was", "one", "our", "out", "day", "get",
-        "has", "him", "his", "how", "its", "may", "new", "now",
-        "old", "see", "two", "way", "who", "did", "attack", "at",
-        "dawn", "send", "troops", "report", "enemy", "base", "fire"
-    ]
-
-    words_in_message = decrypted_message.lower().split()
-    found_words = [word for word in words_in_message if word in common_words]
-
-    if len(words_in_message) == 0:
-        score = 0
-    else:
-        score = len(found_words) / len(words_in_message) * 100
-
-    return found_words, score
-
+    return {"success": False, "attempts": attempts}
 
 # ============================================================
 # UI
 # ============================================================
 
-st.markdown('<div class="main-title">🔐 Enigma Cracker Simulator</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="subtitle">Encrypt a message, then crack it with a simplified Bombe-style attack</div>',
-    unsafe_allow_html=True
-)
+st.title("🔐 Enigma Machine Simulator")
+st.caption("Educational Streamlit version with daily codebook, manual settings, and simplified Bombe demo.")
 
-st.markdown('<div class="section-box">', unsafe_allow_html=True)
-
-message = st.text_area(
-    "Enter a message to encrypt",
-    height=140,
-    placeholder="Example: attack at dawn"
-)
-
-message_type = st.selectbox(
-    "Message type",
-    [
-        "MILITARY ORDER",
-        "INTELLIGENCE REPORT",
-        "DIPLOMATIC COMMUNICATION",
-        "FIELD TRANSMISSION",
-        "PERSONAL MESSAGE",
-        "UNCLASSIFIED"
-    ]
-)
-
-use_random_plugboard = st.checkbox("Use random plugboard", value=False)
-
-crib = st.text_input("Known crib / guessed phrase for cracking", value="attack")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    encrypt_clicked = st.button("Encrypt Message")
-
-with col2:
-    crack_clicked = st.button("Crack Message")
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# session storage
-if "encrypted_message" not in st.session_state:
-    st.session_state.encrypted_message = ""
-
-if "original_message" not in st.session_state:
-    st.session_state.original_message = ""
-
-if "plugboard_used" not in st.session_state:
-    st.session_state.plugboard_used = None
-
-if "rotors_used" not in st.session_state:
-    st.session_state.rotors_used = None
-
+tab1, tab2, tab3 = st.tabs(["Encrypt / Decrypt", "Monthly Codebook", "Bombe Demo"])
 
 # ============================================================
-# ENCRYPT
+# TAB 1
 # ============================================================
 
-if encrypt_clicked:
-    if message.strip() == "":
-        st.warning("Please enter a message first.")
+with tab1:
+    st.subheader("Encrypt / Decrypt")
+
+    mode = st.radio(
+        "Choose configuration mode",
+        ["Today's daily key", "Manual settings"],
+        horizontal=True
+    )
+
+    codebook = generate_monthly_codebook()
+    todays_settings, today_day = get_todays_settings(codebook)
+
+    if mode == "Today's daily key":
+        rotor_names, positions, rings, plugboard_str = format_settings(todays_settings)
+
+        st.info(f"Using day {today_day} settings from this month's codebook.")
+
+        with st.expander("View today's settings"):
+            st.write(f"**Rotors:** {', '.join(rotor_names)}")
+            st.write(f"**Start positions:** {', '.join(positions)}")
+            st.write(f"**Ring settings:** {rings}")
+            st.write(f"**Plugboard:** {plugboard_str}")
+
+        machine_settings = todays_settings
+
     else:
-        rotors = [create_dictionary(3), create_dictionary(7), create_dictionary(19)]
+        col1, col2, col3 = st.columns(3)
 
-        if use_random_plugboard:
-            plugboard = create_plugboard()
-        else:
-            plugboard = {c: c for c in "abcdefghijklmnopqrstuvwxyz"}
+        rotor_options = {name: idx for idx, (_, _, name) in enumerate(ALL_ROTORS)}
 
-        encrypted = encrypt_enigma(message, rotors, plugboard)
-        decrypted = decrypt_enigma(encrypted, rotors, plugboard)
+        with col1:
+            left_rotor_name = st.selectbox("Left rotor", list(rotor_options.keys()), index=0)
+            middle_rotor_name = st.selectbox("Middle rotor", list(rotor_options.keys()), index=1)
+            right_rotor_name = st.selectbox("Right rotor", list(rotor_options.keys()), index=2)
 
-        st.session_state.encrypted_message = encrypted
-        st.session_state.original_message = message
-        st.session_state.plugboard_used = plugboard
-        st.session_state.rotors_used = (3, 7, 19)
+        with col2:
+            left_pos = st.selectbox("Left position", list(ALPHABET), index=0)
+            middle_pos = st.selectbox("Middle position", list(ALPHABET), index=0)
+            right_pos = st.selectbox("Right position", list(ALPHABET), index=0)
 
-        st.markdown("### Encrypted Transmission")
-        st.markdown(
-            f"""
-<div class="result-box">
-<b>Message Type:</b> {message_type}<br><br>
-<b>Original:</b> {message}<br>
-<b>Encrypted:</b> {encrypted}<br>
-<b>Decrypted check:</b> {decrypted}<br><br>
-<b>Rotor shifts:</b> 3, 7, 19
-</div>
-""",
-            unsafe_allow_html=True
+        with col3:
+            left_ring = st.number_input("Left ring", min_value=0, max_value=25, value=0)
+            middle_ring = st.number_input("Middle ring", min_value=0, max_value=25, value=0)
+            right_ring = st.number_input("Right ring", min_value=0, max_value=25, value=0)
+
+        plugboard_text = st.text_input(
+            "Plugboard pairs",
+            placeholder="AB CD EF GH",
+            help="Use space-separated 2-letter pairs. Example: AB CD EF"
         )
 
-        if use_random_plugboard:
-            swaps = {k: v for k, v in plugboard.items() if k != v}
-            st.write("Plugboard swaps:")
-            st.json(swaps)
+        try:
+            plugboard_pairs = parse_plugboard_input(plugboard_text)
+            machine_settings = {
+                "rotors": [
+                    rotor_options[left_rotor_name],
+                    rotor_options[middle_rotor_name],
+                    rotor_options[right_rotor_name],
+                ],
+                "positions": [
+                    ALPHABET.index(left_pos),
+                    ALPHABET.index(middle_pos),
+                    ALPHABET.index(right_pos),
+                ],
+                "ring_settings": [left_ring, middle_ring, right_ring],
+                "plugboard": plugboard_pairs,
+            }
+        except ValueError as e:
+            st.error(str(e))
+            machine_settings = None
 
+    message_type = st.selectbox("Message type", MESSAGE_TYPES, index=0)
+    message = st.text_area("Enter message", height=140, placeholder="Type your message here...")
+
+    colA, colB = st.columns(2)
+
+    with colA:
+        run_encrypt = st.button("Encrypt and Decrypt", use_container_width=True)
+
+    with colB:
+        run_demo = st.button("Rotor Demo (AAAAA)", use_container_width=True)
+
+    if run_encrypt:
+        if not message.strip():
+            st.warning("Enter a message first.")
+        elif machine_settings is None:
+            st.warning("Fix the settings first.")
+        else:
+            machine = build_machine_from_settings(machine_settings)
+            encrypted = machine.encrypt_message(message)
+
+            decrypt_machine = build_machine_from_settings(machine_settings)
+            decrypted = decrypt_machine.encrypt_message(encrypted)
+
+            st.success("Processing complete.")
+            st.markdown("### Results")
+            st.write(f"**Message type:** {message_type}")
+            st.write(f"**Original:** {message.upper()}")
+            st.write(f"**Encrypted:** {encrypted}")
+            st.write(f"**Decrypted:** {decrypted}")
+
+    if run_demo:
+        if machine_settings is None:
+            st.warning("Fix the settings first.")
+        else:
+            demo_machine = build_machine_from_settings(machine_settings)
+            results = [demo_machine.encrypt_letter("A") for _ in range(5)]
+            st.markdown("### Rotor Advancement Demo")
+            st.write(f"**A A A A A → {' '.join(results)}**")
+            st.caption("Same input changes because the rotors step after each keypress.")
 
 # ============================================================
-# CRACK
+# TAB 2
 # ============================================================
 
-if crack_clicked:
-    encrypted_message = st.session_state.encrypted_message
+with tab2:
+    st.subheader("Monthly Codebook")
 
-    if encrypted_message == "":
-        st.warning("Encrypt a message first so the cracker has something to attack.")
-    elif crib.strip() == "":
-        st.warning("Please enter a crib phrase.")
-    else:
-        st.markdown("## Bletchley Park Crack Attempt")
+    codebook = generate_monthly_codebook()
 
-        # Step 1
-        st.markdown('<div class="step-title">Step 1: Frequency Analysis</div>', unsafe_allow_html=True)
-        rows, most_common = frequency_analysis(encrypted_message)
+    rows = []
+    for day in range(1, 27):
+        s = codebook[day]
+        rotor_names = ", ".join(ALL_ROTORS[r][2] for r in s["rotors"])
+        positions = ", ".join(ALPHABET[p] for p in s["positions"])
+        rings = ", ".join(str(r) for r in s["ring_settings"])
+        plugboard = " ".join(a + b for a, b in s["plugboard"])
 
-        if rows:
-            st.write("Most frequent letters in the encrypted text:")
-            st.table({
-                "Letter": [r[0] for r in rows],
-                "Count": [r[1] for r in rows],
-                "Frequency %": [r[2] for r in rows]
-            })
-            st.info(f"Most frequent encrypted letter: '{most_common}'. In English, 'e' is often most common.")
+        rows.append({
+            "Day": day,
+            "Rotors": rotor_names,
+            "Positions": positions,
+            "Ring Settings": rings,
+            "Plugboard": plugboard
+        })
+
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+    st.caption("The codebook is seeded by the current month, so it stays stable during the month and changes next month.")
+
+# ============================================================
+# TAB 3
+# ============================================================
+
+with tab3:
+    st.subheader("Simplified Bombe Demo")
+    st.warning("This is a teaching demo, not a full historical Bombe recreation.")
+
+    encrypted_text = st.text_input("Encrypted text", value="KQFZLQ KX WQIU")
+    crib = st.text_input("Expected crib", value="ATTACK")
+
+    if st.button("Run Bombe Demo", use_container_width=True):
+        if not encrypted_text.strip() or not crib.strip():
+            st.warning("Enter both encrypted text and a crib.")
         else:
-            st.info("No letters found to analyse.")
+            with st.spinner("Testing rotor positions..."):
+                result = bombe_crack(encrypted_text, crib)
 
-        # Step 2
-        st.markdown('<div class="step-title">Step 2: Crib Dragging</div>', unsafe_allow_html=True)
-        crib_results = crib_drag(encrypted_message, crib)
-
-        if crib_results:
-            possible_positions = [r["position"] for r in crib_results if r["possible"]]
-
-            preview_rows = []
-            for r in crib_results:
-                preview_rows.append({
-                    "Position": r["position"],
-                    "Segment": r["segment"],
-                    "Possible": "Yes" if r["possible"] else "No"
-                })
-
-            st.table(preview_rows)
-
-            if possible_positions:
-                st.success(f"Possible crib positions: {possible_positions}")
+            if result["success"]:
+                st.success("Possible match found.")
+                st.write(f"**Attempts:** {result['attempts']}")
+                st.write(f"**Rotor positions:** {result['positions']}")
+                st.write(f"**Decrypted text:** {result['decrypted']}")
             else:
-                st.error("No valid crib positions found using the no-self-encrypt rule.")
-        else:
-            possible_positions = []
-            st.error("Crib is empty or longer than the encrypted message.")
-
-        # Step 3
-        st.markdown('<div class="step-title">Step 3: Bombe Attack</div>', unsafe_allow_html=True)
-        st.write("Testing rotor combinations with no plugboard, like a simplified Bombe demo...")
-
-        if possible_positions:
-            result = bombe_attack(encrypted_message, crib)
-
-            # Step 4
-            if result:
-                st.markdown('<div class="step-title">Step 4: English Language Check</div>', unsafe_allow_html=True)
-                found_words, score = check_english(result["decrypted"])
-
-                st.markdown(
-                    f"""
-<div class="result-box">
-<b>Rotor shifts found:</b> {result["shift1"]}, {result["shift2"]}, {result["shift3"]}<br>
-<b>Attempts:</b> {result["attempts"]}<br>
-<b>Decrypted output:</b> {result["decrypted"]}<br>
-<b>Recognised English words:</b> {", ".join(found_words) if found_words else "None"}<br>
-<b>English confidence score:</b> {score:.0f}%
-</div>
-""",
-                    unsafe_allow_html=True
-                )
-
-                if score > 50:
-                    st.success("High confidence: this looks like real English.")
-                elif score > 20:
-                    st.warning("Possible match: might be correct.")
-                else:
-                    st.error("Low confidence: probably wrong settings.")
-
-                st.markdown("### Crack Summary")
-                st.markdown(
-                    f"""
-<div class="result-box">
-<b>Encrypted message:</b> {encrypted_message}<br>
-<b>Cracked message:</b> {result["decrypted"]}<br>
-<b>Recovered rotor shifts:</b> {result["shift1"]}, {result["shift2"]}, {result["shift3"]}
-</div>
-""",
-                    unsafe_allow_html=True
-                )
-            else:
-                st.error("The Bombe attack did not find a matching rotor combination.")
-        else:
-            st.warning("Skipping Bombe attack because crib dragging found no plausible positions.")
-
-st.markdown(
-    '<div class="footer-text">Built with Streamlit • Simplified Enigma + Bombe demonstration</div>',
-    unsafe_allow_html=True
-)
+                st.error("No match found with this simplified demo.")
+                st.write(f"**Attempts:** {result['attempts']}")
